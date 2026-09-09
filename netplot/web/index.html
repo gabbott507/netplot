@@ -189,6 +189,7 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let agents = [];
+let localAgentId = null;
 let selectedAgent = null;
 let endpoints = [];
 let currentId = null;
@@ -423,8 +424,8 @@ function renderAgentList() {
   const now = Date.now() / 1000;
   if (!agents.length) { lst.innerHTML = '<div class="muted">No agents yet.</div>'; return; }
   lst.innerHTML = agents.map(a => {
-    const online = a.last_seen != null && (now - a.last_seen) < 90;
-    const status = `<span class="${online ? "online" : "offline"}">${online ? "● online" : "○ offline"}</span>`;
+    const online = a.id === localAgentId || (a.last_seen != null && (now - a.last_seen) < 90);
+    const status = `<span id="astat-${a.id}" class="${online ? "online" : "offline"}">${online ? "● online" : "○ offline"}</span>`;
     const del = a.name === "local" ? "" : `<button data-id="${a.id}">Delete</button>`;
     return `<div class="agentrow"><span><b>${a.name}</b> ${status}</span>${del}</div>`;
   }).join("");
@@ -438,6 +439,7 @@ function renderAgentList() {
 async function loadAgents() {
   const j = await api("/api/agents");
   agents = j.agents || [];
+  localAgentId = j.local_agent_id || null;
   const sel = $("agentSel");
   sel.innerHTML = "";
   for (const a of agents) {
@@ -451,6 +453,23 @@ async function loadAgents() {
   sel.value = selectedAgent;
   renderAgentList();
   loadEndpoints();
+}
+
+async function refreshAgentStatus() {
+  let j;
+  try { j = await api("/api/agents"); } catch (e) { return; }
+  localAgentId = j.local_agent_id || null;
+  const seen = {};
+  (j.agents || []).forEach(a => { seen[a.id] = a.last_seen; });
+  const now = Date.now() / 1000;
+  agents.forEach((a, i) => {
+    if (seen[a.id] != null) agents[i].last_seen = seen[a.id];
+    const el = document.getElementById("astat-" + a.id);
+    if (!el) return;
+    const online = a.id === localAgentId || (a.last_seen != null && (now - a.last_seen) < 90);
+    el.className = online ? "online" : "offline";
+    el.textContent = online ? "● online" : "○ offline";
+  });
 }
 
 $("agentForm").addEventListener("submit", async (e) => {
@@ -587,6 +606,7 @@ async function boot() {
     await loadAgents();
     setInterval(refresh, 1000);
     setInterval(refreshRoute, 10000);
+    setInterval(refreshAgentStatus, 5000);
   }
 }
 boot();
