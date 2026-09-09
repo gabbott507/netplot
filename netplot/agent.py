@@ -98,6 +98,24 @@ class Outbox:
                     f"DELETE FROM hops WHERE id IN ({marks})", hop_ids)
             self._conn.commit()
 
+    def drop_endpoints(self, keep_ids):
+        # Drop buffered records for endpoints the agent no longer manages so
+        # stale batches are never retried forever after an assignment change.
+        keep = set(keep_ids)
+        with self._lock:
+            if keep:
+                marks = ",".join("?" * len(keep))
+                self._conn.execute(
+                    f"DELETE FROM samples WHERE endpoint_id NOT IN ({marks})",
+                    list(keep))
+                self._conn.execute(
+                    f"DELETE FROM hops WHERE endpoint_id NOT IN ({marks})",
+                    list(keep))
+            else:
+                self._conn.execute("DELETE FROM samples")
+                self._conn.execute("DELETE FROM hops")
+            self._conn.commit()
+
     def prune(self, cutoff: Optional[float] = None):
         cutoff = cutoff or (time.time() - BUFFER_RETENTION_S)
         with self._lock:
@@ -187,6 +205,7 @@ class Agent:
         for eid in list(self._probe_tasks):
             if eid not in live:
                 self._stop(eid)
+        self.outbox.drop_endpoints(live)
 
     def _stop(self, eid: int):
         stop = self._stops.pop(eid, None)
