@@ -1,0 +1,30 @@
+# netplot server stack example (Portainer / docker compose)
+# Copy to netplot-stack.yml, fill in the secrets, and deploy.
+services:
+  netplot:
+    image: netplot:latest
+    container_name: netplot
+    restart: unless-stopped
+    volumes:
+      - netplot_data:/data
+    cap_add:
+      - NET_RAW
+    networks:
+      - netplot
+      - caddy          # optional: join your reverse-proxy network (e.g. Caddy)
+    environment:
+      - PYTHONUNBUFFERED=1
+      - NETPLOT_USER=admin
+      - NETPLOT_PASSWORD=CHANGE_ME_STRONG_PASSWORD
+    command: ["python3", "-m", "netplot",
+              "--db", "/data/netplot.db",
+              "--host", "0.0.0.0",
+              "--port", "8000"]
+
+networks:
+  netplot:
+  caddy:
+    external: true
+
+volumes:
+  netplot_data:

@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+data/
+*.db
+*.db-wal
+*.db-shm
+.ds_store
+# build artifacts
+dist/
+build/
+# live deployment file containing credentials
+netplot-stack.yml

@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>netplot</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --line: #2a3450;
+    --fg: #e6ebf5; --dim: #8b94ab;
+    --good: #35d07f; --warn: #f5b942; --bad: #ff5c5c;
+    --accent: #4f8cff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  header {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 12px 20px; border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  header h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  header h1 span { color: var(--accent); }
+  .muted { color: var(--dim); }
+  #endpointSel { min-width: 220px; padding: 7px 10px; border-radius: 8px;
+    background: #0f1420; color: var(--fg); border: 1px solid var(--line); }
+  button { padding: 7px 12px; border-radius: 8px; border: 1px solid var(--line);
+    background: #232d45; color: var(--fg); cursor: pointer; }
+  button:hover { background: #2b3752; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  main { display: grid; grid-template-columns: 1fr 300px; gap: 16px;
+    padding: 16px 20px; }
+  .panel { background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 14px; }
+  .chartlabel { font-size: 12px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: .5px; margin: 0 0 4px; }
+  .chartlabel b { color: var(--fg); }
+  .dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+    margin-right:5px; vertical-align:middle; }
+  canvas { width: 100%; display: block; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+    gap: 10px; }
+  .stat { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    background: #121a2b; }
+  .stat .label { font-size: 11px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: .5px; }
+  .stat .value { font-size: 20px; font-weight: 600; margin-top: 2px;
+    font-variant-numeric: tabular-nums; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .winsel { display: flex; gap: 4px; }
+  .winsel button { padding: 4px 9px; font-size: 12px; }
+  .winsel button.active { background: var(--accent); border-color: var(--accent); }
+  #lossBadge { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  #tracePre { max-height: 260px; overflow: auto; background: #0f1420;
+    border: 1px solid var(--line); border-radius: 8px; padding: 10px;
+    font: 11px/1.5 ui-monospace, monospace; white-space: pre; }
+  #addForm { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  #addForm input { padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: #0f1420; color: var(--fg); width: 100px; }
+  #addHost { flex: 1; min-width: 160px; }
+  select, input:focus { outline: none; border-color: var(--accent); }
+  h2 { font-size: 13px; margin: 0 0 10px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: .5px; }
+  h2 span { font-size: 11px; text-transform: none; letter-spacing: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line);
+    font-variant-numeric: tabular-nums; }
+  th { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  td.addr { font-family: ui-monospace, monospace; font-size: 12px; }
+  td.bad { color: var(--bad); font-weight: 600; }
+  td.num { text-align: right; }
+  th.num { text-align: right; }
+  .note { font-size: 11px; color: var(--dim); margin-top: 8px; line-height: 1.5; }
+  #agentSel { min-width: 150px; padding: 7px 10px; border-radius: 8px;
+    background: #0f1420; color: var(--fg); border: 1px solid var(--line); }
+  .agentrow { display:flex; align-items:center; justify-content:space-between;
+    gap:8px; padding:6px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .online { color: var(--good); } .offline { color: var(--dim); }
+  #tokenBox pre { font: 11px/1.5 ui-monospace,monospace; background:#0f1420;
+    border:1px solid var(--line); border-radius:8px; padding:10px; white-space:pre-wrap; }
+  .agentform { display:flex; gap:8px; margin-top:10px; }
+  .agentform input { flex:1; min-width:0; padding:7px 10px; border-radius:8px;
+    border:1px solid var(--line); background:#0f1420; color:var(--fg); }
+  #login { position:fixed; inset:0; background:rgba(10,14,24,.92);
+    display:flex; align-items:center; justify-content:center; z-index:50; }
+  #login[hidden] { display:none; }
+  .login-card { background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:28px 32px; width:320px; }
+  .login-card h2 { margin:0 0 6px; font-size:20px; color:var(--fg); text-transform:none; letter-spacing:.2px;}
+  .login-card p { margin:0 0 18px; color:var(--dim); font-size:13px; }
+  .login-card label { display:block; font-size:12px; color:var(--dim); margin:10px 0 4px; }
+  .login-card input { width:100%; padding:9px 10px; border-radius:8px;
+    border:1px solid var(--line); background:#0f1420; color:var(--fg); }
+  #loginMsg { color:var(--bad); font-size:13px; margin-top:12px; min-height:18px; }
+  .login-card button { width:100%; margin-top:16px; padding:10px; }
+</style>
+</head>
+<body>
+<div id="login" hidden>
+  <div class="login-card">
+    <h2>net<span style="color:var(--accent)">plot</span></h2>
+    <p>Sign in to the monitoring dashboard</p>
+    <form id="loginForm">
+      <label for="loginUser">Username</label>
+      <input id="loginUser" autocomplete="username" required>
+      <label for="loginPass">Password</label>
+      <input id="loginPass" type="password" autocomplete="current-password" required>
+      <button class="primary" type="submit">Sign in</button>
+    </form>
+    <div id="loginMsg"></div>
+  </div>
+</div>
+<header>
+  <h1>net<span>plot</span> <span class="muted" id="version"></span></h1>
+  <select id="agentSel" title="Monitoring agent"></select>
+  <select id="endpointSel"></select>
+  <div class="toolbar">
+    <span class="muted">window</span>
+    <div class="winsel" id="winsel">
+      <button data-w="60">1m</button>
+      <button data-w="300" class="active">5m</button>
+      <button data-w="1800">30m</button>
+      <button data-w="3600">1h</button>
+      <button data-w="21600">6h</button>
+      <button data-w="86400">24h</button>
+    </div>
+    <button id="traceBtn">Traceroute</button>
+    <button id="pauseBtn">Pause</button>
+    <button id="logoutBtn" title="Sign out" hidden>Logout</button>
+    <button id="removeBtn">Remove</button>
+    <span id="lossBadge"></span>
+  </div>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="chartlabel"><span class="dot" style="background:var(--accent)"></span><b>Latency</b> (round-trip time)</div>
+    <div id="chartWrap"><canvas id="chart" width="1000" height="300"></canvas></div>
+
+    <div class="chartlabel" style="margin-top:16px"><span class="dot" style="background:var(--warn)"></span><b>Jitter</b> (change between consecutive samples)</div>
+    <div id="chartWrap"><canvas id="chartJitter" width="1000" height="150"></canvas></div>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:16px">
+      <h2>Live stats</h2>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <h2>Agents <span class="muted">(remote monitors)</span></h2>
+      <div id="agentList"></div>
+      <form class="agentform" id="agentForm">
+        <input id="agentName" placeholder="new agent name">
+        <button class="primary" type="submit">Add agent</button>
+      </form>
+      <div id="agentToken" hidden style="margin-top:10px">
+        <div class="note">Install this agent on the endpoint (netplot must be present there):</div>
+        <div id="tokenBox"><pre id="agentInstallCmd"></pre></div>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>Add endpoint</h2>
+      <form id="addForm">
+        <input id="addHost" placeholder="hostname or IP" required>
+        <select id="addProbe">
+          <option value="icmp">ICMP</option>
+          <option value="tcp">TCP</option>
+        </select>
+        <input id="addPort" placeholder="port" value="443">
+        <input id="addInterval" placeholder="int s" value="1">
+        <button class="primary" type="submit">Add</button>
+      </form>
+    </div>
+    <div class="panel" style="margin-top:16px" id="tracePanel" hidden>
+      <h2>Route to <span id="traceHost"></span></h2>
+      <pre id="tracePre"></pre>
+    </div>
+  </div>
+</main>
+
+<div class="panel" style="margin:0 20px 20px; grid-column:1/-1" id="routePanel">
+  <h2>Route &nbsp;·&nbsp; per-hop stats <span class="muted" id="routeMeta"></span></h2>
+  <table id="hopTable"></table>
+  <div class="note" id="routeNote">Per-hop stats accumulate from periodic traceroutes — click “Traceroute” for a fresh single trace.</div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let agents = [];
+let selectedAgent = null;
+let endpoints = [];
+let currentId = null;
+let windowSec = 300;
+let hopIntervalS = 30;
+let hopTraceQ = 3;
+
+const fmt = (v) => (v == null ? "—" : (Math.round(v*10)/10).toFixed(v>=100?0:1));
+const fmtTime = (t) => new Date(t*1000).toLocaleTimeString();
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  const j = await r.json();
+  if (!r.ok && j.error) throw new Error(j.error);
+  return j;
+}
+
+// ---- endpoint management ------------------------------------------------
+async function loadEndpoints() {
+  const j = await api("/api/endpoints");
+  endpoints = selectedAgent == null ? j.endpoints
+    : j.endpoints.filter(e => e.agent_id === selectedAgent);
+  const sel = $("endpointSel");
+  sel.innerHTML = "";
+  for (const ep of endpoints) {
+    const o = document.createElement("option");
+    o.value = ep.id;
+    let label = ep.name || ep.host;
+    if (ep.probe_type === "tcp") label += ` (tcp:${ep.port})`;
+    if (!ep.enabled) label += " (paused)";
+    o.textContent = label;
+    sel.appendChild(o);
+  }
+  if (endpoints.length) {
+    if (!currentId || !endpoints.some(e => e.id === currentId)) {
+      currentId = endpoints[0].id;
+    }
+    sel.value = currentId;
+  } else {
+    currentId = null;
+  }
+  const cur = endpoints.find(x => x.id === currentId);
+  $("pauseBtn").textContent = cur && !cur.enabled ? "Resume" : "Pause";
+  refresh();
+  refreshRoute();
+}
+
+$("agentSel").addEventListener("change", (e) => {
+  selectedAgent = parseInt(e.target.value, 10);
+  renderAgentList();
+  loadEndpoints();
+});
+
+$("endpointSel").addEventListener("change", (e) => {
+  currentId = parseInt(e.target.value, 10);
+  refresh();
+  refreshRoute();
+});
+
+$("winsel").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b) return;
+  windowSec = parseInt(b.dataset.w, 10);
+  document.querySelectorAll("#winsel button").forEach(x => x.classList.toggle("active", x === b));
+  refresh();
+  refreshRoute();
+});
+
+$("addForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const probe = $("addProbe").value;
+  const port = probe === "tcp" ? parseInt($("addPort").value || "443", 10) : 443;
+  await api("/api/endpoints", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      host: $("addHost").value.trim(),
+      probe_type: probe, port, interval: parseFloat($("addInterval").value || "1"),
+      agent_id: selectedAgent,
+    }),
+  });
+  $("addHost").value = "";
+  await loadEndpoints();
+});
+
+$("pauseBtn").addEventListener("click", async () => {
+  if (!currentId) return;
+  const ep = endpoints.find(x => x.id === currentId);
+  if (!ep) return;
+  const enabled = !ep.enabled;
+  await api("/api/endpoints/enable", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: currentId, enabled}),
+  });
+  await loadEndpoints();
+});
+
+$("removeBtn").addEventListener("click", async () => {
+  if (!currentId) return;
+  if (!confirm("Remove this endpoint and its history?")) return;
+  await fetch(`/api/endpoints?endpoint=${currentId}`, {method: "DELETE"});
+  currentId = null;
+  await loadEndpoints();
+});
+
+$("traceBtn").addEventListener("click", async () => {
+  if (!currentId) return;
+  const ep = endpoints.find(x => x.id === currentId);
+  if (!ep) return;
+  $("tracePanel").hidden = false;
+  $("traceHost").textContent = ep.host;
+  $("tracePre").textContent = "tracing…";
+  const j = await api(`/api/trace?host=${encodeURIComponent(ep.host)}`);
+  $("tracePre").textContent = j.lines ? j.lines.join("\n") : (j.error || "no output");
+});
+
+// ---- stats + charts -----------------------------------------------------
+function niceCeil(v) {
+  if (!(v > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const n = v / p;
+  const n2 = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+  return n2 * p;
+}
+
+function drawGraph(canvasId, samples, opts) {
+  const canvas = $(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth || 1000;
+  const h = opts.height || 150;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.height = h + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = 44, padR = 12, padT = 12, padB = 22;
+  const pw = w - padL - padR, ph = h - padT - padB;
+
+  const pts = (opts.points || []).filter(p => Number.isFinite(p.y));
+  const yMax = niceCeil(Math.max(1, ...pts.map(p => p.y)) * 1.1);
+
+  ctx.strokeStyle = "#232d45"; ctx.lineWidth = 1; ctx.fillStyle = "#8b94ab";
+  ctx.font = "11px ui-monospace, monospace"; ctx.textAlign = "right"; ctx.textBaseline = "middle";
+  const yTicks = 5;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = padT + ph - (ph * i / yTicks);
+    const val = yMax * i / yTicks;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.fillText((val >= 100 ? Math.round(val) : val.toFixed(1)), padL - 6, y);
+  }
+
+  const allTs = opts.tsAxis || [];
+  if (allTs.length < 2 || pts.length === 0) {
+    ctx.fillStyle = "#8b94ab"; ctx.textAlign = "center";
+    ctx.fillText("Collecting data…", w / 2, h / 2);
+    return;
+  }
+  const t0 = allTs[0], t1 = allTs[allTs.length - 1], span = Math.max(t1 - t0, 1);
+  const X = (ts) => padL + ((ts - t0) / span) * pw;
+  const Y = (r) => padT + ph - (r / yMax) * ph;
+
+  ctx.textAlign = "center"; ctx.textBaseline = "top";
+  const nTicks = Math.min(6, Math.floor(pw / 120));
+  for (let i = 0; i < nTicks; i++) {
+    const ts = t0 + span * i / (nTicks - 1);
+    ctx.fillText(fmtTime(ts), X(ts), h - padB + 4);
+  }
+
+  // line
+  ctx.strokeStyle = opts.color; ctx.lineWidth = 1.6; ctx.beginPath();
+  let started = false;
+  for (const p of pts) {
+    const x = X(p.ts), y = Y(p.y);
+    if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // dots
+  ctx.fillStyle = opts.color;
+  for (const p of pts) { ctx.beginPath(); ctx.arc(X(p.ts), Y(p.y), 2.2, 0, Math.PI * 2); ctx.fill(); }
+
+  // loss markers (red X) pinned near the top of the latency chart
+  if (opts.loss && opts.loss.length) {
+    ctx.strokeStyle = "#ff5c5c"; ctx.lineWidth = 2;
+    for (const ts of opts.loss) {
+      const x = X(ts), yy = padT + 10;
+      ctx.beginPath(); ctx.moveTo(x - 4, yy - 4); ctx.lineTo(x + 4, yy + 4);
+      ctx.moveTo(x + 4, yy - 4); ctx.lineTo(x - 4, yy + 4); ctx.stroke();
+    }
+  }
+}
+
+function drawCharts(samples) {
+  const lossTs = samples.filter(s => s.lost).map(s => s.ts);
+  const oks = samples.filter(s => !s.lost && Number.isFinite(s.rtt_ms));
+  const jitter = [];
+  for (let i = 1; i < oks.length; i++) {
+    jitter.push({ ts: oks[i].ts, y: Math.abs(oks[i].rtt_ms - oks[i - 1].rtt_ms) });
+  }
+  drawGraph("chart", samples, {
+    height: 300, color: "#4f8cff",
+    points: oks.map(s => ({ ts: s.ts, y: s.rtt_ms })),
+    loss: lossTs, tsAxis: samples.map(s => s.ts),
+  });
+  const jAxis = jitter.length ? jitter.map(p => p.ts) : samples.map(s => s.ts);
+  drawGraph("chartJitter", samples, {
+    height: 150, color: "#f5b942", points: jitter, tsAxis: jAxis,
+  });
+}
+
+async function refresh() {
+  if (!currentId) {
+    $("stats").innerHTML = '<div class="muted">Add an endpoint to start monitoring.</div>';
+    $("lossBadge").textContent = "";
+    drawCharts([]);
+    return;
+  }
+  try {
+    const [s, samp] = await Promise.all([
+      api(`/api/summary?endpoint=${currentId}&window=${windowSec}`),
+      api(`/api/samples?endpoint=${currentId}&window=${windowSec}`),
+    ]);
+    renderStats(s.summary, samp.samples);
+    drawCharts(samp.samples);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+// ---- agent management ----------------------------------------------------
+function renderAgentList() {
+  const lst = $("agentList");
+  const now = Date.now() / 1000;
+  if (!agents.length) { lst.innerHTML = '<div class="muted">No agents yet.</div>'; return; }
+  lst.innerHTML = agents.map(a => {
+    const online = a.last_seen != null && (now - a.last_seen) < 90;
+    const status = `<span class="${online ? "online" : "offline"}">${online ? "● online" : "○ offline"}</span>`;
+    const del = a.name === "local" ? "" : `<button data-id="${a.id}">Delete</button>`;
+    return `<div class="agentrow"><span><b>${a.name}</b> ${status}</span>${del}</div>`;
+  }).join("");
+  lst.querySelectorAll("button[data-id]").forEach(b => b.addEventListener("click", async () => {
+    if (!confirm("Delete this agent and all its endpoints/data?")) return;
+    await fetch(`/api/agents?agent=${b.dataset.id}`, { method: "DELETE" });
+    await loadAgents();
+  }));
+}
+
+async function loadAgents() {
+  const j = await api("/api/agents");
+  agents = j.agents || [];
+  const sel = $("agentSel");
+  sel.innerHTML = "";
+  for (const a of agents) {
+    const o = document.createElement("option");
+    o.value = a.id; o.textContent = a.name;
+    sel.appendChild(o);
+  }
+  if (agents.length && !agents.some(a => a.id === selectedAgent)) {
+    selectedAgent = agents[0].id;
+  }
+  sel.value = selectedAgent;
+  renderAgentList();
+  loadEndpoints();
+}
+
+$("agentForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("agentName").value.trim();
+  if (!name) return;
+  const j = await api("/api/agents", {
+    method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ name }),
+  });
+  $("agentName").value = "";
+  const a = j.agent;
+  const cmd = `python3 -m netplot agent --server ${location.origin} --token ${a.token}`;
+  $("agentInstallCmd").textContent = cmd;
+  $("agentToken").hidden = false;
+  await loadAgents();
+});
+
+function renderStats(s, samples) {
+  const color = s.loss_pct >= 5 ? "var(--bad)" : s.loss_pct >= 1 ? "var(--warn)" : "var(--good)";
+  $("lossBadge").textContent = `packet loss ${s.loss_pct}%`;
+  $("lossBadge").style.background = color;
+  $("lossBadge").style.color = "#0f1420";
+  const ok = samples.filter(x => !x.lost && x.rtt_ms != null);
+  const last = ok.length ? ok[ok.length - 1].rtt_ms : null;
+  const rows = [
+    ["Current", fmt(last) + " ms"],
+    ["Min", fmt(s.min_ms) + " ms"],
+    ["Avg", fmt(s.avg_ms) + " ms"],
+    ["Max", fmt(s.max_ms) + " ms"],
+    ["Jitter", fmt(s.jitter_ms) + " ms"],
+    ["Probes", s.count],
+    ["Lost", s.lost],
+  ];
+  $("stats").innerHTML = rows.map(([l, v]) =>
+    `<div class="stat"><div class="label">${l}</div><div class="value">${v}</div></div>`).join("");
+}
+
+// ---- route (per-hop) table -----------------------------------------------
+async function refreshRoute() {
+  if (!currentId) {
+    $("hopTable").innerHTML = ""; $("routeMeta").textContent = ""; return;
+  }
+  const ep = endpoints.find(x => x.id === currentId);
+  if (!ep) return;
+  try {
+    const j = await api(`/api/route?endpoint=${currentId}&window=${windowSec}`);
+    renderHops(j.hops, ep, j.window);
+  } catch (err) {
+    console.error(err);
+    $("hopTable").innerHTML = `<tr><td class="bad">Couldn’t load route stats: ${err}</td></tr>`;
+  }
+}
+
+function renderHops(hops, ep, winSec) {
+  const winTxt = winSec >= 86400 ? (winSec/86400) + "d" : winSec >= 3600 ? (winSec/3600) + "h"
+    : winSec >= 60 ? (winSec/60) + "m" : winSec + "s";
+  const updated = new Date().toLocaleTimeString();
+  const traces = hops.length ? Math.round(Math.max(...hops.map(h => h.count)) / hopTraceQ) : 0;
+  $("routeMeta").textContent = `${hops.length} hop${hops.length===1?"":"s"} in view · ${winTxt} window · updated ${updated}`;
+  $("routeNote").textContent = `Stats accumulate from repeated automatic traceroutes. “Probes” = every probe in the current window (${hopTraceQ} per trace); currently ~${traces} trace${traces===1?"":"s"}. A new trace runs about every ${hopIntervalS}s, so the counts climb over time. “Loss x/y” = lost out of total probes. Hit “Traceroute” for one fresh trace now.`;
+  if (!hops.length) {
+    $("hopTable").innerHTML = `<tr><td class="muted">Waiting for first traceroute… (runs every ${hopIntervalS}s)</td></tr>`;
+    return;
+  }
+  const headers = `<tr><th>Hop</th><th>Address</th><th>Loss</th><th class="num">Probes</th><th class="num">Min</th><th class="num">Avg</th><th class="num">Max</th></tr>`;
+  const rows = hops.map(h => {
+    const addr = h.address === "*" ? "*" : (h.host && h.host !== h.address ? h.address + " <span class=\"muted\">(" + h.host + ")</span>" : h.address);
+    const lossCls = h.loss_pct > 0 ? "bad" : "";
+    return `<tr>
+      <td>${h.hop}</td>
+      <td class="addr">${addr}</td>
+      <td class="${lossCls}">${h.loss_pct}% &nbsp;<span class="muted">(${h.lost}/${h.count})</span></td>
+      <td class="num">${h.count}</td>
+      <td class="num">${fmt(h.min_ms)}</td>
+      <td class="num">${fmt(h.avg_ms)}</td>
+      <td class="num">${fmt(h.max_ms)}</td>
+    </tr>`;
+  }).join("");
+  $("hopTable").innerHTML = headers + rows;
+}
+
+let booted = false, loginBound = false;
+
+function showLogin() {
+  $("login").hidden = false;
+  $("logoutBtn").hidden = true;
+  if (!loginBound) {
+    loginBound = true;
+    $("loginForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const msg = $("loginMsg");
+      msg.textContent = "";
+      try {
+        await api("/api/login", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            username: $("loginUser").value.trim(),
+            password: $("loginPass").value,
+          }),
+        });
+        $("loginPass").value = "";
+        $("login").hidden = true;
+        await boot();
+      } catch (e) {
+        msg.textContent = "Invalid username or password";
+      }
+    });
+  }
+  $("loginUser").focus();
+}
+
+$("logoutBtn").addEventListener("click", async () => {
+  try { await fetch("/api/logout", {method: "POST"}); } catch (e) {}
+  $("logoutBtn").hidden = true;
+  currentId = null;
+  showLogin();
+});
+
+async function boot() {
+  let authed = false;
+  try {
+    const info = await api("/api/info");
+    $("version").textContent = "v" + info.version;
+    if (info.hop_interval != null) hopIntervalS = info.hop_interval;
+    authed = true;
+  } catch (e) {
+    if (String(e).includes("unauthorized")) { showLogin(); return; }
+    $("version").textContent = "";
+  }
+  $("logoutBtn").hidden = false;
+  if (!booted && authed) {
+    booted = true;
+    await loadAgents();
+    setInterval(refresh, 1000);
+    setInterval(refreshRoute, 10000);
+  }
+}
+boot();
+</script>
+</body>
+</html>

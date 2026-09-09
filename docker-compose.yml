@@ -1,0 +1,17 @@
+# netplot server via docker compose
+services:
+  netplot:
+    build: .
+    container_name: netplot
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data          # SQLite history persists here
+    cap_add:
+      - NET_RAW               # unprivileged ICMP/traceroute in the container
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Optional: adjust via CLI flags instead if you prefer
+      - NETPLOT_RETENTION_DAYS=7
+      - NETPLOT_HOP_INTERVAL=30
