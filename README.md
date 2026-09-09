@@ -11,6 +11,8 @@ monitoring assignments from the server, probe, and push results back.
 
 No third-party packages are required — it runs on the Python standard library.
 
+<img width="2403" height="1041" alt="image" src="https://github.com/user-attachments/assets/4fc15acd-d108-4450-9aa1-e7faf4f264d8" />
+
 ## Features
 
 - **Continuous monitoring** of any number of endpoints at once.
