@@ -118,4 +118,14 @@ async def run_trace(host: str, query: int = 3, max_hops: int = 20,
             rec["ts"] = ts
             records.append(rec)
     await proc.wait()
-    return records
+    return _strip_trailing_stars(records)
+
+
+def _strip_trailing_stars(records):
+    """Drop the trailing '* * *' filler traceroute prints after the last real
+    hop (it would otherwise bloat the agent buffer and the server DB). Genuine
+    mid-route loss (a '*' before a real hop) is preserved."""
+    cut = len(records)
+    while cut > 0 and records[cut - 1].get("address") == "*":
+        cut -= 1
+    return records[:cut]
