@@ -306,6 +306,12 @@ async def run_agent(server: str, token: str, db_path: str,
     agent = Agent(server, token, db_path, config_interval, flush_interval)
     try:
         await agent.run()
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        # Ctrl+C cancels the event-loop task, which surfaces here as
+        # CancelledError (not KeyboardInterrupt). Clean up and exit quietly
+        # rather than dumping an asyncio traceback.
         print("\nagent: shutting down")
-        await agent.shutdown()
+        try:
+            await agent.shutdown()
+        except BaseException:
+            pass
